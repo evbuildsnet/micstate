@@ -4,7 +4,6 @@ import Foundation
 enum Prefs {
     static let playSound = "playSound"
     static let showToast = "showToast"
-    static let muteOnMeetingStart = "muteOnMeetingStart"
     static let yieldBundleIDs = "yieldBundleIDs"
     static let ignoreBundleIDs = "ignoreBundleIDs"
 
@@ -23,7 +22,6 @@ enum Prefs {
         UserDefaults.standard.register(defaults: [
             playSound: true,
             showToast: true,
-            muteOnMeetingStart: true,
             yieldBundleIDs: defaultYieldBundleIDs,
             ignoreBundleIDs: defaultIgnoreBundleIDs,
         ])
@@ -31,7 +29,6 @@ enum Prefs {
 
     static var isSoundOn: Bool { UserDefaults.standard.bool(forKey: playSound) }
     static var isToastOn: Bool { UserDefaults.standard.bool(forKey: showToast) }
-    static var mutesOnMeetingStart: Bool { UserDefaults.standard.bool(forKey: muteOnMeetingStart) }
 
     /// Apps that own the AirPods gesture themselves. While one of them records, MicState steps aside.
     /// Matched by prefix, because apps usually record from a helper process such as `com.microsoft.teams2.helper`.

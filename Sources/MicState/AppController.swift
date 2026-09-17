@@ -41,7 +41,6 @@ final class AppController {
             Task { @MainActor in self?.apply(recorders: self?.presence.recorders ?? []) }
         }
 
-        mute.set(muted: false)
         apply(recorders: presence.recorders)
     }
 
@@ -57,9 +56,6 @@ final class AppController {
         isYielding = recorders.contains { Prefs.yields(to: $0.bundleID) }
         NSLog("MicState: recorders=%@ live=%d yielding=%d muted=%d", recorders.map(\.bundleID).joined(separator: ","), isLive, isYielding, mute.isMuted)
 
-        if isLive, !wasLive, Prefs.mutesOnMeetingStart {
-            mute.set(muted: true)
-        }
         if !isLive, wasLive {
             mute.set(muted: false)
         }

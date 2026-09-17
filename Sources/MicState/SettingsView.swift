@@ -12,7 +12,6 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @AppStorage(Prefs.playSound) private var playSound = true
     @AppStorage(Prefs.showToast) private var showToast = true
-    @AppStorage(Prefs.muteOnMeetingStart) private var muteOnMeetingStart = true
     @AppStorage(Prefs.yieldBundleIDs) private var yieldBundleIDs = Prefs.defaultYieldBundleIDs
     @AppStorage(Prefs.ignoreBundleIDs) private var ignoreBundleIDs = Prefs.defaultIgnoreBundleIDs
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -24,7 +23,6 @@ struct SettingsView: View {
                 Toggle("Show notice under the notch", isOn: $showToast)
             }
             Section("Behavior") {
-                Toggle("Mute automatically when a meeting starts", isOn: $muteOnMeetingStart)
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
                         do { on ? try SMAppService.mainApp.register() : try SMAppService.mainApp.unregister() }
