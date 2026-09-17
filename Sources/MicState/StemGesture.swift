@@ -9,7 +9,6 @@ import Foundation
 /// capturing. The system's own mute state is never written from here.
 /// The capture engine is rebuilt whenever the default input device changes, because an engine bound
 /// to the old device stops capturing and macOS then reports "Cannot Control Mic".
-@MainActor
 final class StemGesture {
     private(set) var isEngaged = false
     var onGesture: ((Bool) -> Void)?
@@ -21,14 +20,17 @@ final class StemGesture {
     private var deviceToken: CoreAudio.ListenerToken?
     private var pendingRestart: DispatchWorkItem?
 
+    /// Must run before anything else in the process touches CoreAudio. The audio session server only
+    /// honors the Bluetooth-mute opt-in when the app registers its handler at explicit creation; an app
+    /// instance created implicitly by earlier HAL activity is never opted in, and every stem press is
+    /// rejected with "Cannot Control Mic".
     init() {
+        registerHandler()
         configToken = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: nil, queue: .main
         ) { [weak self] note in
-            Task { @MainActor in
-                guard let self, (note.object as? AVAudioEngine) === self.engine else { return }
-                self.scheduleRestart(reason: "engine configuration change")
-            }
+            guard let self, (note.object as? AVAudioEngine) === self.engine else { return }
+            self.scheduleRestart(reason: "engine configuration change")
         }
         muteNotificationToken = NotificationCenter.default.addObserver(
             forName: AVAudioApplication.inputMuteStateChangeNotification, object: nil, queue: .main
@@ -44,15 +46,21 @@ final class StemGesture {
         guard !isEngaged else { return }
         isEngaged = true
         Log.info("stem: engaging")
+        let onCallbackThread = Variant.registerOffMain
         AVAudioApplication.requestRecordPermission { [weak self] granted in
-            Task { @MainActor in
+            guard granted else {
+                Log.info("microphone permission denied, AirPods gesture unavailable")
+                return
+            }
+            if onCallbackThread {
+                Log.info("stem: registering on callback thread (variant)")
                 guard let self, self.isEngaged else { return }
-                guard granted else {
-                    Log.info("microphone permission denied, AirPods gesture unavailable")
-                    return
-                }
-                self.registerHandler()
                 self.startEngine()
+            } else {
+                Task { @MainActor in
+                    guard let self, self.isEngaged else { return }
+                    self.startEngine()
+                }
             }
         }
     }
@@ -61,8 +69,6 @@ final class StemGesture {
         guard isEngaged else { return }
         isEngaged = false
         pendingRestart?.cancel()
-        try? AVAudioApplication.shared.setInputMuteStateChangeHandler(nil)
-        handlerRegistered = false
         stopEngine()
         Log.info("stem: disengaged")
     }

@@ -4,9 +4,10 @@ import Foundation
 /// Wires the pieces together and holds the policy.
 @MainActor
 final class AppController {
+    // Declaration order matters: `stem` registers the mute handler before any CoreAudio access.
+    private let stem = StemGesture()
     private let mute = MuteEngine()
     private let presence = MicPresence()
-    private let stem = StemGesture()
     private let chime = Chime()
     private let toast = NotchToast()
     private let statusItem = StatusItemController()
@@ -44,6 +45,7 @@ final class AppController {
             Task { @MainActor in self?.apply(recorders: self?.presence.recorders ?? []) }
         }
 
+        Log.info("variant=\(Variant.raw) registerOffMain=\(Variant.registerOffMain) regularApp=\(Variant.regularApp)")
         apply(recorders: presence.recorders)
     }
 

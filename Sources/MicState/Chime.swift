@@ -10,13 +10,15 @@ final class Chime {
     private lazy var up = render(from: 620, to: 930)
     private lazy var down = render(from: 930, to: 620)
 
-    init() {
-        engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        engine.mainMixerNode.outputVolume = 0.5
-    }
+    private var isBuilt = false
 
     func play(muted: Bool) {
+        if !isBuilt {
+            engine.attach(player)
+            engine.connect(player, to: engine.mainMixerNode, format: format)
+            engine.mainMixerNode.outputVolume = 0.5
+            isBuilt = true
+        }
         if !engine.isRunning {
             do { try engine.start() } catch { return }
         }
