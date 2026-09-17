@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.showToast) private var showToast = true
     @AppStorage(Prefs.muteOnMeetingStart) private var muteOnMeetingStart = true
     @AppStorage(Prefs.yieldBundleIDs) private var yieldBundleIDs = Prefs.defaultYieldBundleIDs
+    @AppStorage(Prefs.ignoreBundleIDs) private var ignoreBundleIDs = Prefs.defaultIgnoreBundleIDs
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -38,6 +39,15 @@ struct SettingsView: View {
                 Text("Apps that handle the AirPods button themselves")
             } footer: {
                 Text("One bundle ID per line. While one of these apps records, MicState leaves the AirPods button to it.")
+            }
+            Section {
+                TextEditor(text: $ignoreBundleIDs)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(minHeight: 70)
+            } header: {
+                Text("Apps that are not meetings")
+            } footer: {
+                Text("One bundle ID prefix per line. Dictation tools and system services that record in the background go here.")
             }
             Section("Now") {
                 LabeledContent("Input device", value: model.deviceName)

@@ -22,6 +22,7 @@ final class AppController {
         statusItem.statusLine = { [unowned self] in statusLine() }
 
         mute.onChange = { [unowned self] muted in
+            NSLog("MicState: mute flag -> %d on %@", muted, mute.deviceName)
             stem.sync(muted: muted)
             if isLive {
                 if Prefs.isSoundOn { chime.play(muted: muted) }
@@ -49,14 +50,18 @@ final class AppController {
         mute.set(muted: false)
     }
 
-    private func apply(recorders: [Recorder]) {
+    private func apply(recorders allRecorders: [Recorder]) {
+        let recorders = allRecorders.filter { !Prefs.ignores($0.bundleID) }
         let wasLive = isLive
         isLive = !recorders.isEmpty
-        let yield = Prefs.yieldSet
-        isYielding = recorders.contains { yield.contains($0.bundleID) }
+        isYielding = recorders.contains { Prefs.yields(to: $0.bundleID) }
+        NSLog("MicState: recorders=%@ live=%d yielding=%d muted=%d", recorders.map(\.bundleID).joined(separator: ","), isLive, isYielding, mute.isMuted)
 
         if isLive, !wasLive, Prefs.mutesOnMeetingStart {
             mute.set(muted: true)
+        }
+        if !isLive, wasLive {
+            mute.set(muted: false)
         }
         if isLive, !isYielding {
             stem.engage(muted: mute.isMuted)
@@ -73,7 +78,7 @@ final class AppController {
 
     private func statusLine() -> String {
         guard isLive else { return "Microphone idle · \(mute.deviceName)" }
-        let who = presence.recorders.map { $0.bundleID.split(separator: ".").last.map(String.init) ?? $0.bundleID }.joined(separator: ", ")
+        let who = presence.recorders.filter { !Prefs.ignores($0.bundleID) }.map { $0.bundleID.split(separator: ".").last.map(String.init) ?? $0.bundleID }.joined(separator: ", ")
         let owner = isYielding ? " · AirPods button handled by app" : ""
         return "\(mute.isMuted ? "Muted" : "Live") · \(who)\(owner)"
     }

@@ -6,10 +6,17 @@ enum Prefs {
     static let showToast = "showToast"
     static let muteOnMeetingStart = "muteOnMeetingStart"
     static let yieldBundleIDs = "yieldBundleIDs"
+    static let ignoreBundleIDs = "ignoreBundleIDs"
 
     static let defaultYieldBundleIDs = """
-    com.microsoft.teams2
     com.microsoft.teams
+    """
+
+    /// Background recorders that are not meetings, such as dictation tools.
+    static let defaultIgnoreBundleIDs = """
+    com.electron.wispr-flow
+    com.apple.CoreSpeech
+    com.apple.assistantd
     """
 
     static func register() {
@@ -18,6 +25,7 @@ enum Prefs {
             showToast: true,
             muteOnMeetingStart: true,
             yieldBundleIDs: defaultYieldBundleIDs,
+            ignoreBundleIDs: defaultIgnoreBundleIDs,
         ])
     }
 
@@ -26,8 +34,17 @@ enum Prefs {
     static var mutesOnMeetingStart: Bool { UserDefaults.standard.bool(forKey: muteOnMeetingStart) }
 
     /// Apps that own the AirPods gesture themselves. While one of them records, MicState steps aside.
-    static var yieldSet: Set<String> {
-        let raw = UserDefaults.standard.string(forKey: yieldBundleIDs) ?? ""
-        return Set(raw.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
+    /// Matched by prefix, because apps usually record from a helper process such as `com.microsoft.teams2.helper`.
+    static func yields(to bundleID: String) -> Bool {
+        prefixes(yieldBundleIDs).contains { bundleID.hasPrefix($0) }
+    }
+
+    static func ignores(_ bundleID: String) -> Bool {
+        prefixes(ignoreBundleIDs).contains { bundleID.hasPrefix($0) }
+    }
+
+    private static func prefixes(_ key: String) -> [String] {
+        let raw = UserDefaults.standard.string(forKey: key) ?? ""
+        return raw.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     }
 }
