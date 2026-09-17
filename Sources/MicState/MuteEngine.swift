@@ -42,7 +42,7 @@ final class MuteEngine {
         if CoreAudio.isSettable(device, Self.muteAddress) {
             muteToken = CoreAudio.listen(device, Self.muteAddress) { [weak self] in self?.refresh() }
         } else {
-            NSLog("MicState: \(deviceName) has no settable input mute flag")
+            Log.info("\(deviceName) has no settable input mute flag")
         }
         refresh()
     }

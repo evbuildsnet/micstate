@@ -22,7 +22,7 @@ final class AppController {
         statusItem.statusLine = { [unowned self] in statusLine() }
 
         mute.onChange = { [unowned self] muted in
-            NSLog("MicState: mute flag -> %d on %@", muted, mute.deviceName)
+            Log.info("mute flag -> \(muted) on \(mute.deviceName)")
             stem.sync(muted: muted)
             if isLive {
                 if Prefs.isSoundOn { chime.play(muted: muted) }
@@ -54,7 +54,7 @@ final class AppController {
         let wasLive = isLive
         isLive = !recorders.isEmpty
         isYielding = recorders.contains { Prefs.yields(to: $0.bundleID) }
-        NSLog("MicState: recorders=%@ live=%d yielding=%d muted=%d", recorders.map(\.bundleID).joined(separator: ","), isLive, isYielding, mute.isMuted)
+        Log.info("recorders=[\(recorders.map(\.bundleID).joined(separator: ", "))] live=\(isLive) yielding=\(isYielding) muted=\(mute.isMuted)")
 
         if !isLive, wasLive {
             mute.set(muted: false)
