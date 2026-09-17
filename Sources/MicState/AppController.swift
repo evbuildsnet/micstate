@@ -17,7 +17,10 @@ final class AppController {
     private var isYielding = false
 
     init() {
-        statusItem.onToggle = { [unowned self] in mute.toggle() }
+        statusItem.onToggle = { [unowned self] in
+            Log.info("toggle from status item")
+            mute.toggle()
+        }
         statusItem.onOpenSettings = { [unowned self] in settingsWindow.show() }
         statusItem.statusLine = { [unowned self] in statusLine() }
 
@@ -31,6 +34,7 @@ final class AppController {
             render()
         }
         stem.onGesture = { [unowned self] shouldMute in
+            Log.info("gesture wants muted=\(shouldMute), device muted=\(mute.isMuted)")
             if shouldMute != mute.isMuted { mute.set(muted: shouldMute) }
         }
         presence.onChange = { [unowned self] recorders in

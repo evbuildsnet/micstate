@@ -23,7 +23,8 @@ final class MuteEngine {
 
     func set(muted: Bool) {
         guard let device else { return }
-        CoreAudio.set(device, Self.muteAddress, UInt32(muted ? 1 : 0))
+        let ok = CoreAudio.set(device, Self.muteAddress, UInt32(muted ? 1 : 0))
+        Log.info("set device mute=\(muted) on \(deviceName) ok=\(ok)")
         refresh()
     }
 
@@ -39,6 +40,7 @@ final class MuteEngine {
             return
         }
         deviceName = CoreAudio.getString(device, CoreAudio.address(kAudioObjectPropertyName)) ?? "Input"
+        Log.info("default input is now \(deviceName)")
         if CoreAudio.isSettable(device, Self.muteAddress) {
             muteToken = CoreAudio.listen(device, Self.muteAddress) { [weak self] in self?.refresh() }
         } else {

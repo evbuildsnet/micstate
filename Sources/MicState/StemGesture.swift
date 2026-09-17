@@ -15,16 +15,28 @@ final class StemGesture {
     private var engine: AVAudioEngine?
     private var lastMuted = false
     private var configToken: NSObjectProtocol?
+    private var muteNotificationToken: NSObjectProtocol?
     private var deviceToken: CoreAudio.ListenerToken?
     private var pendingRestart: DispatchWorkItem?
 
     init() {
         configToken = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.scheduleRestart(reason: "engine configuration change") }
+        ) { [weak self] note in
+            Task { @MainActor in
+                guard let self else { return }
+                let ours = (note.object as? AVAudioEngine) === self.engine
+                Log.info("stem: engine configuration change (ours=\(ours))")
+                if ours { self.scheduleRestart(reason: "engine configuration change") }
+            }
+        }
+        muteNotificationToken = NotificationCenter.default.addObserver(
+            forName: AVAudioApplication.inputMuteStateChangeNotification, object: nil, queue: .main
+        ) { note in
+            Log.info("stem: system notification inputMuted=\(note.userInfo?[AVAudioApplication.muteStateKey] ?? "?")")
         }
         deviceToken = CoreAudio.listen(CoreAudio.system, CoreAudio.address(kAudioHardwarePropertyDefaultInputDevice)) { [weak self] in
+            Log.info("stem: default input changed")
             self?.scheduleRestart(reason: "default input changed")
         }
     }
@@ -33,6 +45,7 @@ final class StemGesture {
         lastMuted = muted
         guard !isEngaged else { return }
         isEngaged = true
+        Log.info("stem: engaging (muted=\(muted))")
         AVAudioApplication.requestRecordPermission { [weak self] granted in
             Task { @MainActor in
                 guard let self, self.isEngaged else { return }
@@ -58,17 +71,21 @@ final class StemGesture {
     func sync(muted: Bool) {
         lastMuted = muted
         guard isEngaged, AVAudioApplication.shared.isInputMuted != muted else { return }
+        Log.info("stem: sync system inputMuted -> \(muted)")
         try? AVAudioApplication.shared.setInputMuted(muted)
     }
 
     private func start() {
         let app = AVAudioApplication.shared
+        Log.info("stem: start, system inputMuted=\(app.isInputMuted) lastMuted=\(lastMuted)")
         try? app.setInputMuted(lastMuted)
         do {
             try app.setInputMuteStateChangeHandler { [weak self] shouldMute in
+                Log.info("stem: HANDLER inputShouldBeMuted=\(shouldMute) thread=\(Thread.isMainThread ? "main" : "bg")")
                 Task { @MainActor in self?.onGesture?(shouldMute) }
                 return true
             }
+            Log.info("stem: handler registered")
         } catch {
             Log.info("stem: cannot register mute handler: \(error)")
         }
@@ -101,6 +118,7 @@ final class StemGesture {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         self.engine = nil
+        Log.info("stem: engine stopped")
     }
 
     private func scheduleRestart(reason: String) {
