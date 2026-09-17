@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Builds MicState.app into build/ and ad-hoc signs it so TCC permissions stick.
+# Builds MicState.app into build/ and prefers a stable local signing identity.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 swift build -c release

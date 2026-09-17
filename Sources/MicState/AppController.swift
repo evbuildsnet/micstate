@@ -45,7 +45,6 @@ final class AppController {
             Task { @MainActor in self?.apply(recorders: self?.presence.recorders ?? []) }
         }
 
-        Log.info("variant=\(Variant.raw) registerOffMain=\(Variant.registerOffMain) regularApp=\(Variant.regularApp)")
         apply(recorders: presence.recorders)
     }
 
@@ -64,9 +63,7 @@ final class AppController {
         if !isLive, wasLive {
             mute.set(muted: false)
         }
-        // Debug aid: `defaults write net.evbuilds.micstate alwaysEngage -bool true` keeps the stream open even when idle.
-        let alwaysEngage = UserDefaults.standard.bool(forKey: "alwaysEngage")
-        if (isLive || alwaysEngage), !isYielding {
+        if isLive, !isYielding {
             stem.engage()
         } else {
             stem.disengage()

@@ -8,9 +8,9 @@ struct Recorder: Hashable {
 
 /// Tracks which other processes currently capture audio input, using CoreAudio process objects.
 ///
-/// Triggers: the process list changing, and the default input device starting or stopping "somewhere".
-/// The list change arrives before a new process actually starts capturing, so every trigger also
-/// schedules a delayed rescan.
+/// Device-wide activity cannot detect a meeting ending while our own stream is still open,
+/// and process input properties do not reliably emit change notifications on every device.
+/// Poll once per second as a fallback; list/device events also trigger an immediate and delayed scan.
 @MainActor
 final class MicPresence {
     private(set) var recorders: [Recorder] = []
@@ -20,6 +20,7 @@ final class MicPresence {
     private var listToken: CoreAudio.ListenerToken?
     private var defaultDeviceToken: CoreAudio.ListenerToken?
     private var runningToken: CoreAudio.ListenerToken?
+    private let pollTimer = DispatchSource.makeTimerSource(queue: .main)
     private var delayedRescan: DispatchWorkItem?
 
     private static let listAddress = CoreAudio.address(kAudioHardwarePropertyProcessObjectList)
@@ -35,7 +36,12 @@ final class MicPresence {
         }
         attachToDefaultDevice()
         rescan()
+        pollTimer.schedule(deadline: .now() + 1, repeating: 1, leeway: .milliseconds(100))
+        pollTimer.setEventHandler { [weak self] in self?.rescan() }
+        pollTimer.resume()
     }
+
+    deinit { pollTimer.cancel() }
 
     private func attachToDefaultDevice() {
         runningToken = nil

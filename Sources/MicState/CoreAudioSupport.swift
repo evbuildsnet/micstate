@@ -38,10 +38,10 @@ enum CoreAudio {
     }
 
     @discardableResult
-    static func set<T>(_ object: AudioObjectID, _ address: AudioObjectPropertyAddress, _ value: T) -> Bool {
+    static func set(_ object: AudioObjectID, _ address: AudioObjectPropertyAddress, _ value: UInt32) -> Bool {
         var address = address
         var value = value
-        return AudioObjectSetPropertyData(object, &address, 0, nil, UInt32(MemoryLayout<T>.size), &value) == noErr
+        return AudioObjectSetPropertyData(object, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value) == noErr
     }
 
     static func isSettable(_ object: AudioObjectID, _ address: AudioObjectPropertyAddress) -> Bool {

@@ -12,9 +12,10 @@ enum Log {
     }()
 
     static func info(_ message: String) {
-        let line = "\(stamp.string(from: Date())) \(message)\n"
+        let date = Date()
         NSLog("MicState: %@", message)
         queue.async {
+            let line = "\(stamp.string(from: date)) \(message)\n"
             let fd = open(path, O_WRONLY | O_APPEND | O_CREAT, 0o644)
             guard fd >= 0 else { return }
             line.withCString { _ = write(fd, $0, strlen($0)) }
