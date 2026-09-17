@@ -1,0 +1,80 @@
+import AppKit
+import Foundation
+
+/// Wires the pieces together and holds the policy.
+@MainActor
+final class AppController {
+    private let mute = MuteEngine()
+    private let presence = MicPresence()
+    private let stem = StemGesture()
+    private let chime = Chime()
+    private let toast = NotchToast()
+    private let statusItem = StatusItemController()
+    private let settingsModel = SettingsModel()
+    private lazy var settingsWindow = SettingsWindow(model: settingsModel)
+
+    private var isLive = false
+    private var isYielding = false
+
+    init() {
+        statusItem.onToggle = { [unowned self] in mute.toggle() }
+        statusItem.onOpenSettings = { [unowned self] in settingsWindow.show() }
+        statusItem.statusLine = { [unowned self] in statusLine() }
+
+        mute.onChange = { [unowned self] muted in
+            stem.sync(muted: muted)
+            if isLive {
+                if Prefs.isSoundOn { chime.play(muted: muted) }
+                if Prefs.isToastOn { toast.show(muted: muted) }
+            }
+            render()
+        }
+        stem.onGesture = { [unowned self] shouldMute in
+            if shouldMute != mute.isMuted { mute.set(muted: shouldMute) }
+        }
+        presence.onChange = { [unowned self] recorders in
+            settingsModel.recorders = recorders
+            apply(recorders: recorders)
+        }
+        NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.apply(recorders: self?.presence.recorders ?? []) }
+        }
+
+        mute.set(muted: false)
+        apply(recorders: presence.recorders)
+    }
+
+    func shutdown() {
+        stem.disengage()
+        mute.set(muted: false)
+    }
+
+    private func apply(recorders: [Recorder]) {
+        let wasLive = isLive
+        isLive = !recorders.isEmpty
+        let yield = Prefs.yieldSet
+        isYielding = recorders.contains { yield.contains($0.bundleID) }
+
+        if isLive, !wasLive, Prefs.mutesOnMeetingStart {
+            mute.set(muted: true)
+        }
+        if isLive, !isYielding {
+            stem.engage(muted: mute.isMuted)
+        } else {
+            stem.disengage()
+        }
+        settingsModel.deviceName = mute.deviceName
+        render()
+    }
+
+    private func render() {
+        statusItem.render(isLive ? .live(muted: mute.isMuted) : .idle)
+    }
+
+    private func statusLine() -> String {
+        guard isLive else { return "Microphone idle · \(mute.deviceName)" }
+        let who = presence.recorders.map { $0.bundleID.split(separator: ".").last.map(String.init) ?? $0.bundleID }.joined(separator: ", ")
+        let owner = isYielding ? " · AirPods button handled by app" : ""
+        return "\(mute.isMuted ? "Muted" : "Live") · \(who)\(owner)"
+    }
+}
