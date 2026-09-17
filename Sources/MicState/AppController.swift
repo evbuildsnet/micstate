@@ -26,7 +26,6 @@ final class AppController {
 
         mute.onChange = { [unowned self] muted in
             Log.info("mute flag -> \(muted) on \(mute.deviceName)")
-            stem.sync(muted: muted)
             if isLive {
                 if Prefs.isSoundOn { chime.play(muted: muted) }
                 if Prefs.isToastOn { toast.show(muted: muted) }
@@ -63,8 +62,10 @@ final class AppController {
         if !isLive, wasLive {
             mute.set(muted: false)
         }
-        if isLive, !isYielding {
-            stem.engage(muted: mute.isMuted)
+        // Debug aid: `defaults write net.evbuilds.micstate alwaysEngage -bool true` keeps the stream open even when idle.
+        let alwaysEngage = UserDefaults.standard.bool(forKey: "alwaysEngage")
+        if (isLive || alwaysEngage), !isYielding {
+            stem.engage()
         } else {
             stem.disengage()
         }
