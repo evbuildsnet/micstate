@@ -12,6 +12,6 @@ cp Info.plist "$APP/Contents/Info.plist"
 IDENTITIES=$(security find-identity -v -p codesigning 2>/dev/null)
 IDENTITY=$(echo "$IDENTITIES" | awk -F'"' '/Developer ID Application/ {print $2; exit}')
 [[ -z "$IDENTITY" ]] && IDENTITY=$(echo "$IDENTITIES" | awk -F'"' '/Apple Development/ {print $2; exit}')
-codesign --force --options runtime --sign "${IDENTITY:--}" "$APP"
+codesign --force --options runtime --entitlements MicState.entitlements --sign "${IDENTITY:--}" "$APP"
 echo "signed as ${IDENTITY:-ad-hoc}"
 echo "built $APP"
