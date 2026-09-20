@@ -27,6 +27,11 @@ enum Prefs {
         ])
     }
 
+    /// Everything `AppController` derives policy from; used to ignore unrelated defaults changes.
+    static func snapshot() -> [String] {
+        [playSound, showToast, yieldBundleIDs, ignoreBundleIDs].map { UserDefaults.standard.string(forKey: $0) ?? "" }
+    }
+
     static var isSoundOn: Bool { UserDefaults.standard.bool(forKey: playSound) }
     static var isToastOn: Bool { UserDefaults.standard.bool(forKey: showToast) }
 

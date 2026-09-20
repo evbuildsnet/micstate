@@ -7,6 +7,7 @@ final class MuteEngine {
     private(set) var isMuted = false
     private(set) var deviceName = "No input"
     var onChange: ((Bool) -> Void)?
+    var onDeviceChange: (() -> Void)?
 
     private var device: AudioDeviceID?
     private var defaultDeviceToken: CoreAudio.ListenerToken?
@@ -37,6 +38,7 @@ final class MuteEngine {
         guard let device else {
             deviceName = "No input"
             refresh()
+            onDeviceChange?()
             return
         }
         deviceName = CoreAudio.getString(device, CoreAudio.address(kAudioObjectPropertyName)) ?? "Input"
@@ -47,6 +49,7 @@ final class MuteEngine {
             Log.info("\(deviceName) has no settable input mute flag")
         }
         refresh()
+        onDeviceChange?()
     }
 
     private func refresh() {

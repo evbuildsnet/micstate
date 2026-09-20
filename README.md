@@ -6,7 +6,8 @@ Menu bar microphone switch for macOS. One icon, always visible, as narrow as the
 - Red mic: a meeting has the mic and you are live.
 - Slashed mic: a meeting has the mic and you are muted at the hardware level.
 
-Left click toggles. Right click opens the menu with Settings and Quit.
+Left click toggles while a meeting is live; otherwise it opens the menu, so an idle click can never leave the
+mic muted. MicState unmutes the device whenever nobody is recording, including after a device switch.
 
 ## How it mutes
 
@@ -38,6 +39,12 @@ Settings controls MicState's sound and one-second notice below the notch. AirPod
 show macOS's own "Microphone On/Off" banner. Apple provides no documented API to suppress that
 system banner; the app's feedback settings only affect MicState's own feedback.
 Apple describes the system banner in its [AirPods mute-control overview](https://developer.apple.com/videos/play/wwdc2023/10233/).
+
+## Hearing yourself
+
+`tools/voice-test.html` records your voice through the browser's meeting pipeline (open it in Helium or Chrome).
+Record once with MicState running and once after quitting it, then listen to both. Sending the "A" file back
+makes it possible to inspect the audio for dropouts.
 
 ## Implementation notes
 

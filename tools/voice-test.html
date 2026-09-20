@@ -1,0 +1,103 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>MicState voice test</title>
+<style>
+  body { font: 16px/1.5 -apple-system, system-ui; max-width: 640px; margin: 48px auto; padding: 0 20px; color: #111; }
+  h1 { font-size: 22px; }
+  .slot { border: 1px solid #ddd; border-radius: 12px; padding: 16px 20px; margin: 16px 0; }
+  .slot h2 { font-size: 17px; margin: 0 0 6px; }
+  .hint { color: #666; font-size: 14px; margin: 0 0 12px; }
+  button { font: inherit; padding: 8px 16px; border-radius: 8px; border: 1px solid #bbb; background: #f6f6f6; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.rec { background: #d33; color: #fff; border-color: #b22; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  audio { width: 100%; margin-top: 12px; }
+  .status { min-width: 160px; font-variant-numeric: tabular-nums; }
+  .device { font-size: 13px; color: #666; margin-top: 8px; }
+  a.dl { font-size: 14px; }
+</style>
+
+<h1>MicState voice test</h1>
+<p>Records your microphone through the same browser audio pipeline a meeting uses
+(echo cancellation, noise suppression, gain control) and keeps the speaker path open like a real call.
+Speak normally for the whole 10 seconds, then listen to both recordings back to back.</p>
+
+<div class="slot" id="a">
+  <h2>A · MicState running</h2>
+  <p class="hint">Make sure the MicState icon in the menu bar turns red once recording starts.</p>
+  <div class="row"><button>Record 10 s</button><span class="status"></span></div>
+  <div class="device"></div>
+</div>
+
+<div class="slot" id="b">
+  <h2>B · MicState quit</h2>
+  <p class="hint">Right-click the menu bar icon → Quit MicState, then record.</p>
+  <div class="row"><button>Record 10 s</button><span class="status"></span></div>
+  <div class="device"></div>
+</div>
+
+<p class="hint">Files download as WebM/Opus. If A sounds robotic and B does not, send me the A file.</p>
+
+<script>
+const SECONDS = 10;
+
+async function record(slot) {
+  const button = slot.querySelector('button');
+  const status = slot.querySelector('.status');
+  const deviceLine = slot.querySelector('.device');
+  slot.querySelectorAll('audio, a.dl').forEach(n => n.remove());
+  button.disabled = true;
+
+  // Meet-like constraints.
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  });
+  const track = stream.getAudioTracks()[0];
+  const settings = track.getSettings();
+  deviceLine.textContent = `${track.label} · ${settings.sampleRate ?? '?'} Hz · ${settings.channelCount ?? '?'} ch`;
+
+  // Keep an output stream open for the whole recording so AirPods stay in call mode, as in a meeting.
+  const ctx = new AudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  gain.gain.value = 0.0005;
+  osc.connect(gain).connect(ctx.destination);
+  osc.start();
+
+  const chunks = [];
+  const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+  recorder.ondataavailable = e => chunks.push(e.data);
+  const done = new Promise(resolve => (recorder.onstop = resolve));
+  recorder.start();
+  button.classList.add('rec');
+
+  for (let left = SECONDS; left > 0; left--) {
+    status.textContent = `Recording… ${left}s — speak now`;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  recorder.stop();
+  await done;
+  osc.stop();
+  await ctx.close();
+  stream.getTracks().forEach(t => t.stop());
+
+  const blob = new Blob(chunks, { type: 'audio/webm' });
+  const url = URL.createObjectURL(blob);
+  const audio = Object.assign(document.createElement('audio'), { controls: true, src: url });
+  const name = `micstate-${slot.id.toUpperCase()}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.webm`;
+  const link = Object.assign(document.createElement('a'), { href: url, download: name, textContent: `Download ${name}`, className: 'dl' });
+  slot.append(audio, link);
+  link.click();
+
+  status.textContent = 'Done — press play to listen';
+  button.classList.remove('rec');
+  button.disabled = false;
+}
+
+for (const slot of document.querySelectorAll('.slot')) {
+  slot.querySelector('button').onclick = () => record(slot).catch(err => {
+    slot.querySelector('.status').textContent = `Error: ${err.message}`;
+    slot.querySelector('button').disabled = false;
+  });
+}
+</script>

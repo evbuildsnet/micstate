@@ -16,6 +16,8 @@ final class AppController {
 
     private var isLive = false
     private var isYielding = false
+    private var pendingDisengage: DispatchWorkItem?
+    private var appliedPrefs = Prefs.snapshot()
 
     init() {
         statusItem.onToggle = { [unowned self] in
@@ -30,9 +32,15 @@ final class AppController {
             if isLive {
                 if Prefs.isSoundOn { chime.play(muted: muted) }
                 if Prefs.isToastOn { toast.show(muted: muted) }
+            } else if muted {
+                // Nobody is recording, so a muted device only hides silence from the next app that opens the mic.
+                Log.info("unmuting idle device")
+                mute.set(muted: false)
             }
             render()
         }
+        // A new default device carries its own mute flag; re-run the policy so it is not left muted while idle.
+        mute.onDeviceChange = { [unowned self] in apply(recorders: presence.recorders) }
         stem.onGesture = { [unowned self] shouldMute in
             Log.info("gesture wants muted=\(shouldMute), device muted=\(mute.isMuted)")
             if shouldMute != mute.isMuted { mute.set(muted: shouldMute) }
@@ -42,7 +50,11 @@ final class AppController {
             apply(recorders: recorders)
         }
         NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.apply(recorders: self?.presence.recorders ?? []) }
+            Task { @MainActor in
+                guard let self, Prefs.snapshot() != self.appliedPrefs else { return }
+                self.appliedPrefs = Prefs.snapshot()
+                self.apply(recorders: self.presence.recorders)
+            }
         }
 
         apply(recorders: presence.recorders)
@@ -55,25 +67,33 @@ final class AppController {
 
     private func apply(recorders allRecorders: [Recorder]) {
         let recorders = allRecorders.filter { !Prefs.ignores($0.bundleID) }
-        let wasLive = isLive
         isLive = !recorders.isEmpty
         isYielding = recorders.contains { Prefs.yields(to: $0.bundleID) }
         Log.info("recorders=[\(recorders.map(\.bundleID).joined(separator: ", "))] live=\(isLive) yielding=\(isYielding) muted=\(mute.isMuted)")
 
-        if !isLive, wasLive {
+        if !isLive, mute.isMuted {
             mute.set(muted: false)
         }
         if isLive, !isYielding {
+            pendingDisengage?.cancel()
+            pendingDisengage = nil
             stem.engage()
-        } else {
-            stem.disengage()
+        } else if stem.isEngaged, pendingDisengage == nil {
+            // Meeting apps briefly drop their input stream when they reconfigure it. Restarting the
+            // capture engine on every blip glitches the shared device, so hold on for a moment.
+            let work = DispatchWorkItem { [weak self] in
+                self?.pendingDisengage = nil
+                self?.stem.disengage()
+            }
+            pendingDisengage = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
         }
         settingsModel.deviceName = mute.deviceName
         render()
     }
 
     private func render() {
-        statusItem.render(isLive ? .live(muted: mute.isMuted) : .idle)
+        statusItem.render(isLive ? .live(muted: mute.isMuted) : .idle(muted: mute.isMuted))
     }
 
     private func statusLine() -> String {

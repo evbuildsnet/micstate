@@ -1,11 +1,13 @@
 import AppKit
 
 enum MicIndicator: Equatable {
-    case idle
+    case idle(muted: Bool)
     case live(muted: Bool)
+
+    var isIdle: Bool { if case .idle = self { true } else { false } }
 }
 
-/// Icon-only status item. Left click toggles, right click opens the menu.
+/// Icon-only status item. Left click toggles while live, otherwise opens the menu.
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
     var onToggle: (() -> Void)?
@@ -16,7 +18,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     private let statusMenuItem = NSMenuItem()
     private let toggleMenuItem = NSMenuItem(title: "Mute", action: #selector(toggle), keyEquivalent: "")
-    private var indicator: MicIndicator = .idle
+    private var indicator: MicIndicator = .idle(muted: false)
 
     override init() {
         super.init()
@@ -37,7 +39,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             NSMenuItem(title: "Quit MicState", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"),
         ]
         menu.delegate = self
-        render(.idle)
+        render(.idle(muted: false))
     }
 
     func render(_ indicator: MicIndicator) {
@@ -46,7 +48,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let symbol: String
         let color: NSColor?
         switch indicator {
-        case .idle: (symbol, color) = ("mic", nil)
+        case .idle(muted: false): (symbol, color) = ("mic", nil)
+        case .idle(muted: true): (symbol, color) = ("mic.slash", nil)
         case .live(muted: true): (symbol, color) = ("mic.slash.fill", nil)
         case .live(muted: false): (symbol, color) = ("mic.fill", .systemRed)
         }
@@ -58,12 +61,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             button.image = base
             button.image?.isTemplate = true
         }
-        button.appearsDisabled = indicator == .idle
-        button.toolTip = indicator == .idle ? "Microphone idle" : "Click to toggle microphone"
+        button.appearsDisabled = indicator.isIdle
+        button.toolTip = indicator.isIdle ? "Microphone idle" : "Click to toggle microphone"
     }
 
     @objc private func click() {
-        if NSApp.currentEvent?.type == .rightMouseUp {
+        if NSApp.currentEvent?.type == .rightMouseUp || indicator.isIdle {
             item.menu = menu
             item.button?.performClick(nil)
         } else {
